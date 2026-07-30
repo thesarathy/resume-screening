@@ -48,26 +48,43 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
+def load_spacy_model(model_name: str = "en_core_web_sm") -> Language:
+    """Load a spaCy pipeline, with a clear error if it isn't installed.
+
+    Pulled out as a standalone function (rather than kept private inside
+    TextPreprocessor) so other modules -- like EntityExtractor, added in
+    the next step -- can share the exact same loading/error-handling
+    logic. More importantly, it lets the app load the model **once** at
+    startup and inject that single Language object into every class that
+    needs it, instead of each class silently loading its own copy.
+    Loading a spaCy model takes real time (tens to hundreds of ms) and
+    real memory, so sharing one instance across the app matters once
+    there's more than one consumer of it.
+    """
+    try:
+        return spacy.load(model_name)
+    except OSError as exc:
+        raise RuntimeError(
+            f"spaCy model '{model_name}' is not installed. "
+            f"Run: python -m spacy download {model_name}"
+        ) from exc
+
+
 class TextPreprocessor:
     """Full NLP normalization pipeline, built on spaCy.
 
-    Loading a spaCy model takes real time (tens to hundreds of ms), so
-    this class should be instantiated once per process (e.g. once at
-    app startup) and reused for every resume, not re-created per file.
+    Accepts an already-loaded spaCy pipeline via `nlp` (preferred in the
+    running app, so it can share one pipeline with EntityExtractor), or
+    falls back to loading its own by `model_name` if none is given (handy
+    for quick scripts, notebooks, or tests that only need this one class).
     """
 
-    def __init__(self, model_name: str = "en_core_web_sm") -> None:
-        self._nlp: Language = self._load_model(model_name)
-
-    @staticmethod
-    def _load_model(model_name: str) -> Language:
-        try:
-            return spacy.load(model_name)
-        except OSError as exc:
-            raise RuntimeError(
-                f"spaCy model '{model_name}' is not installed. "
-                f"Run: python -m spacy download {model_name}"
-            ) from exc
+    def __init__(
+        self,
+        nlp: Language | None = None,
+        model_name: str = "en_core_web_sm",
+    ) -> None:
+        self._nlp: Language = nlp if nlp is not None else load_spacy_model(model_name)
 
     def normalize(self, text: str) -> str:
         """Full normalization pipeline for TF-IDF.
