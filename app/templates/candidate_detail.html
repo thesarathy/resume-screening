@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ candidate.name or candidate.filename }}{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('ranking_detail', ranking_id=ranking_id) }}"
+   style="display:inline-block; margin-bottom:16px; text-decoration:none; color:var(--muted); font-weight:600; font-size:14px;">
+  ← Back to ranking
+</a>
+
+<div class="card" style="margin-bottom:18px;">
+  <div style="display:flex; gap:18px; align-items:flex-start;">
+    <div class="rank-badge">{{ candidate.rank }}</div>
+    <div style="flex:1;">
+      <h1>{{ candidate.name or candidate.filename }}</h1>
+      <div class="sub">{{ candidate.filename }}</div>
+      <div class="meta" style="color:var(--muted); font-size:14px; margin-top:8px;">
+        {% if candidate.email %}<span>✉ {{ candidate.email }}</span>{% endif %}
+        {% if candidate.phone %}<span>☎ {{ candidate.phone }}</span>{% endif %}
+        {% if candidate.experience_years is not none %}<span>{{ candidate.experience_years }} yrs exp</span>{% endif %}
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div class="pct" style="font-size:24px; font-weight:700;">{{ candidate.match_pct }}%</div>
+      <div class="score-num" style="color:var(--muted); font-size:13px;">similarity {{ "%.3f"|format(candidate.score) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:18px;">
+  <h2 style="font-size:16px; margin:0 0 12px;">Skills</h2>
+  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+    {% for s in candidate.skills %}<span class="chip-skill">{{ s }}</span>{% else %}<span style="color:var(--muted);">—</span>{% endfor %}
+  </div>
+  {% if candidate.candidate_skills %}
+    <div style="margin-top:12px;">
+      <div style="color:var(--muted); font-size:13px; margin-bottom:6px;">Suggested skills (not in taxonomy):</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        {% for s in candidate.candidate_skills %}<span class="chip-skill cand-skill">{{ s }}</span>{% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% if candidate.education %}
+<div class="card" style="margin-bottom:18px;">
+  <h2 style="font-size:16px; margin:0 0 12px;">Education</h2>
+  <ul style="margin:0; padding-left:18px; color:var(--ink);">
+    {% for edu in candidate.education %}<li style="margin-bottom:4px;">{{ edu }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2 style="font-size:16px; margin:0 0 12px;">Resume text</h2>
+  <pre style="white-space:pre-wrap; word-break:break-word; font:inherit; background:#fafaff; border:1px solid var(--line); border-radius:10px; padding:16px; margin:0; color:var(--ink);">{{ candidate.text_preview }}</pre>
+</div>
+{% endblock %}

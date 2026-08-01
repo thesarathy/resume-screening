@@ -47,6 +47,7 @@ class Candidate:
     experience_years: float | None = None
     skills: list[str] = field(default_factory=list)
     candidate_skills: list[str] = field(default_factory=list)
+    text_preview: str = ""
 
     @property
     def match_pct(self) -> int:
@@ -89,6 +90,7 @@ class ResumeRanker:
         self,
         job_description: str,
         resumes: list[tuple[str, str]],
+        preview_chars: int = 1500,
     ) -> list[Candidate]:
         """Score every resume against the job description and return the
         candidates sorted by score, best first.
@@ -96,6 +98,8 @@ class ResumeRanker:
         Args:
             job_description: The raw job posting text.
             resumes: A list of ``(filename, resume_text)`` pairs.
+            preview_chars: Max characters of each resume stored as a
+                ``text_preview`` for the candidate detail view.
 
         Returns:
             A list of :class:`Candidate`, highest score first. If no
@@ -115,7 +119,12 @@ class ResumeRanker:
             candidate_skills = self._skill_extractor.extract_candidate_skills(text)
             candidates.append(
                 self._to_candidate(
-                    filename, entities, skills, candidate_skills, score=0.0
+                    filename,
+                    entities,
+                    skills,
+                    candidate_skills,
+                    score=0.0,
+                    text_preview=text[:preview_chars],
                 )
             )
             resume_texts.append(text)
@@ -134,6 +143,7 @@ class ResumeRanker:
         skills: list[str],
         candidate_skills: list[str],
         score: float,
+        text_preview: str = "",
     ) -> Candidate:
         return Candidate(
             filename=filename,
@@ -145,4 +155,5 @@ class ResumeRanker:
             skills=skills,
             candidate_skills=candidate_skills,
             score=score,
+            text_preview=text_preview,
         )

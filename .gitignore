@@ -19,6 +19,8 @@ models/*
 !models/.gitkeep
 
 tests/tmp_uploads/
+instance/
+*.db
 .pytest_cache/
 .coverage
 htmlcov/

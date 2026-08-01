@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Ranking history{% endblock %}
+
+{% block content %}
+<div class="results-head">
+  <div>
+    <h1>Ranking history</h1>
+    <p class="sub">Every screening run you've done, newest first.</p>
+  </div>
+  <a class="btn-primary" href="{{ url_for('index') }}">＋ New ranking</a>
+</div>
+
+<div class="card" style="padding: 8px;">
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="color:var(--muted); font-size:13px; text-align:left; border-bottom:1px solid var(--line);">
+        <th style="padding:10px 12px;">#</th>
+        <th style="padding:10px 12px;">Job description</th>
+        <th style="padding:10px 12px;">Method</th>
+        <th style="padding:10px 12px;">Candidates</th>
+        <th style="padding:10px 12px;">Date</th>
+        <th style="padding:10px 12px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rankings %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:12px;">{{ r.id }}</td>
+        <td style="padding:12px;">
+          <div style="font-weight:600;">{{ r.job_description[:80] }}{{ '…' if r.job_description|length > 80 }}</div>
+        </td>
+        <td style="padding:12px;"><span class="method-badge">{{ r.method }}</span></td>
+        <td style="padding:12px;">{{ r.candidate_count }}</td>
+        <td style="padding:12px; color:var(--muted); font-size:13px;">
+          {{ r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "" }}
+        </td>
+        <td style="padding:12px; text-align:right;">
+          <a href="{{ url_for('ranking_detail', ranking_id=r.id) }}" class="new-btn"
+             style="text-decoration:none; color:#4338ca; font-weight:600; font-size:13px;">Open →</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">No rankings yet — <a href="{{ url_for('index') }}">rank some resumes</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

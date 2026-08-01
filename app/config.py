@@ -31,6 +31,14 @@ class BaseConfig:
 
     LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 
+    # SQLite by default for local dev; Render/Railway set DATABASE_URL to a
+    # PostgreSQL URL, and SQLAlchemy transparently uses it (portable schema).
+    SQLALCHEMY_DATABASE_URI: str = os.environ.get(
+        "DATABASE_URL",
+        "sqlite:///" + str(BASE_DIR / "instance" / "resume_screening.db"),
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
+
     DEBUG: bool = False
     TESTING: bool = False
 
@@ -44,6 +52,10 @@ class TestingConfig(BaseConfig):
     TESTING = True
     DEBUG = True
     UPLOAD_FOLDER: Path = BASE_DIR / "tests" / "tmp_uploads"
+    # Isolated SQLite file per test run, so tests never touch dev data.
+    SQLALCHEMY_DATABASE_URI: str = "sqlite:///" + str(
+        BASE_DIR / "tests" / "tmp_uploads" / "test.db"
+    )
 
 
 class ProductionConfig(BaseConfig):

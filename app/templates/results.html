@@ -5,9 +5,12 @@
 <div class="results-head">
   <div>
     <h1>Ranked candidates</h1>
-    <span class="method-badge">method · {{ method }}</span>
+    <span class="method-badge">method · {{ ranking.method }} · ranking #{{ ranking.id }}</span>
   </div>
-  <a class="btn-csv" href="{{ url_for('export_csv') }}">⬇ Download CSV</a>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <a class="new-btn" style="text-decoration:none; color:#6b7280; font-weight:600; font-size:14px; border:1px solid #e5e7eb; border-radius:10px; padding:11px 16px;" href="{{ url_for('rankings') }}">🗂 History</a>
+    <a class="btn-csv" href="{{ url_for('ranking_export', ranking_id=ranking.id) }}">⬇ Download CSV</a>
+  </div>
 </div>
 
 {% if errors %}
@@ -21,9 +24,10 @@
 
 {% for c in candidates %}
 <div class="cand">
-  <div class="rank-badge">{{ loop.index }}</div>
+  <div class="rank-badge">{{ c.rank or loop.index }}</div>
   <div class="body">
-    <div class="name">{{ c.name or c.filename }}</div>
+    <a class="name" href="{{ url_for('candidate_detail', ranking_id=ranking.id, candidate_id=c.id) }}"
+       style="text-decoration:none; color:inherit;">{{ c.name or c.filename }}</a>
     <div class="file">{{ c.filename }}</div>
     <div class="meta">
       {% if c.email %}<span>✉ {{ c.email }}</span>{% endif %}

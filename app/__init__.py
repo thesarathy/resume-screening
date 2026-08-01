@@ -1,26 +1,36 @@
 """
 Application factory for the Resume Screening & Candidate Ranking System.
+
+Every ranking is persisted to the database, which powers the ranking
+history and candidate detail features -- and keeps the app ready to host
+(Render/Railway) where the database is PostgreSQL via DATABASE_URL.
 """
 
 import csv
 import io
+import json
 import logging
 from pathlib import Path
 
-from flask import Flask, Response, flash, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    Response,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from werkzeug.utils import secure_filename
 
 from app.config import CONFIG_MAP
 from app.factory import METHOD_TFIDF, VALID_METHODS
+from app.models import Candidate, Ranking, db
 from app.parser import ParsingError, ResumeParser
 from app.ranking import ResumeRanker
 
 logger = logging.getLogger(__name__)
-
-# Holds the most recent ranking so /export.csv can re-emit it without
-# forcing the recruiter to re-upload. A module-level store is fine for a
-# dev tool; swap for a session/cache in a multi-user deployment.
-_last_ranking: dict | None = None
 
 
 def create_app(config_name: str = "default") -> Flask:
@@ -31,11 +41,16 @@ def create_app(config_name: str = "default") -> Flask:
 
     _configure_logging(app)
     _ensure_upload_folder_exists(app)
+    _ensure_db_folder_exists(app)
 
     from app.factory import ScorerFactory
 
     # One shared spaCy pipeline + scorer factory for the whole app.
     app.extensions["scorer_factory"] = ScorerFactory()
+
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
 
     _register_routes(app)
 
@@ -53,8 +68,19 @@ def _configure_logging(app: Flask) -> None:
 
 
 def _ensure_upload_folder_exists(app: Flask) -> None:
-    upload_folder = Path(app.config["UPLOAD_FOLDER"])
-    upload_folder.mkdir(parents=True, exist_ok=True)
+    Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_db_folder_exists(app: Flask) -> None:
+    """Make sure the SQLite file's parent directory exists for local dev.
+
+    PostgreSQL (production) ignores this since its URI has no file path.
+    """
+    uri = app.config["SQLALCHEMY_DATABASE_URI"]
+    if uri.startswith("sqlite:///"):
+        db_path = uri.replace("sqlite:///", "", 1)
+        if db_path and db_path != ":memory:":
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
 
 def _register_routes(app: Flask) -> None:
@@ -86,9 +112,6 @@ def _register_routes(app: Flask) -> None:
         factory = app.extensions["scorer_factory"]
         parser = ResumeParser()
 
-        # Save uploads to disk so the parser (which reads paths) can open
-        # them, then parse each -- a file that fails to parse is flagged
-        # and skipped rather than failing the whole batch.
         saved_paths: list[Path] = []
         resumes: list[tuple[str, str]] = []
         errors: list[str] = []
@@ -97,7 +120,9 @@ def _register_routes(app: Flask) -> None:
             for upload in files:
                 filename = upload.filename or ""
                 if not filename or not _allowed_file(filename, app):
-                    errors.append(f"Skipped '{filename or '(unnamed)'}': unsupported file type.")
+                    errors.append(
+                        f"Skipped '{filename or '(unnamed)'}': unsupported file type."
+                    )
                     continue
                 path = _save_upload(upload, app)
                 saved_paths.append(path)
@@ -119,21 +144,12 @@ def _register_routes(app: Flask) -> None:
             ranker = ResumeRanker(nlp=factory.nlp, scorer=scorer)
             candidates = ranker.rank(job_description, resumes)
 
-            # Stash for the CSV export route.
-            global _last_ranking
-            _last_ranking = {
-                "job_description": job_description,
-                "method": method,
-                "candidates": [c.as_dict() for c in candidates],
-            }
+            ranking_id = _persist_ranking(job_description, method, candidates)
 
-            return render_template(
-                "results.html",
-                job_description=job_description,
-                method=method,
-                candidates=candidates,
-                errors=errors,
-            )
+            for error in errors:
+                flash(error, "error")
+
+            return redirect(url_for("ranking_detail", ranking_id=ranking_id))
         finally:
             for path in saved_paths:
                 try:
@@ -141,12 +157,58 @@ def _register_routes(app: Flask) -> None:
                 except OSError:
                     pass
 
-    @app.route("/export.csv")
-    def export_csv():
-        if not _last_ranking:
-            flash("Nothing to export yet -- run a ranking first.", "error")
-            return redirect(url_for("index"))
-        return _csv_response(_last_ranking)
+    @app.route("/rankings")
+    def rankings():
+        all_rankings = Ranking.query.order_by(Ranking.created_at.desc()).all()
+        return render_template("rankings.html", rankings=all_rankings)
+
+    @app.route("/rankings/<int:ranking_id>")
+    def ranking_detail(ranking_id: int):
+        ranking = db.get_or_404(Ranking, ranking_id)
+        candidates = [c.as_dict() for c in ranking.candidates]
+        return render_template("results.html", ranking=ranking, candidates=candidates)
+
+    @app.route("/rankings/<int:ranking_id>/candidates/<int:candidate_id>")
+    def candidate_detail(ranking_id: int, candidate_id: int):
+        candidate = db.session.get(Candidate, candidate_id)
+        if candidate is None or candidate.ranking_id != ranking_id:
+            abort(404)
+        return render_template(
+            "candidate_detail.html",
+            ranking_id=ranking_id,
+            candidate=candidate.as_dict(),
+        )
+
+    @app.route("/rankings/<int:ranking_id>/export.csv")
+    def ranking_export(ranking_id: int):
+        ranking = db.get_or_404(Ranking, ranking_id)
+        return _csv_response(ranking)
+
+
+def _persist_ranking(
+    job_description: str, method: str, candidates: list
+) -> int:
+    """Save a ranking and its candidates, returning the new Ranking id."""
+    ranking = Ranking(job_description=job_description, method=method)
+    for rank, c in enumerate(candidates, start=1):
+        ranking.candidates.append(
+            Candidate(
+                rank=rank,
+                filename=c.filename,
+                name=c.name,
+                email=c.email,
+                phone=c.phone,
+                experience_years=c.experience_years,
+                score=c.score,
+                education=json.dumps(c.education),
+                skills=json.dumps(c.skills),
+                candidate_skills=json.dumps(c.candidate_skills),
+                text_preview=c.text_preview,
+            )
+        )
+    db.session.add(ranking)
+    db.session.commit()
+    return ranking.id
 
 
 def _allowed_file(filename: str, app: Flask) -> bool:
@@ -165,24 +227,25 @@ def _save_upload(upload, app: Flask) -> Path:
     return path
 
 
-def _csv_response(ranking: dict) -> Response:
-    """Build a UTF-8 (with BOM, for Excel) CSV response from a ranking dict."""
+def _csv_response(ranking: Ranking) -> Response:
+    """Build a UTF-8 (with BOM, for Excel) CSV response from a Ranking."""
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["rank", "filename", "score", "name", "email", "phone",
                      "education", "experience_years", "skills"])
 
-    for rank, cand in enumerate(ranking["candidates"], start=1):
+    for candidate in ranking.candidates:
+        c = candidate.as_dict()
         writer.writerow([
-            rank,
-            cand.get("filename", ""),
-            f"{cand.get('score', 0.0):.2f}",
-            cand.get("name") or "",
-            cand.get("email") or "",
-            cand.get("phone") or "",
-            "; ".join(cand.get("education", [])),
-            cand.get("experience_years") or "",
-            "; ".join(cand.get("skills", [])),
+            c["rank"],
+            c["filename"],
+            f"{c['score']:.2f}",
+            c["name"] or "",
+            c["email"] or "",
+            c["phone"] or "",
+            "; ".join(c["education"]),
+            c["experience_years"] or "",
+            "; ".join(c["skills"]),
         ])
 
     csv_text = buffer.getvalue()
