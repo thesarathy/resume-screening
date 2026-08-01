@@ -1,18 +1,18 @@
-# 🚀 AI Resume Screening & Candidate Ranking System
+# AI Resume Screening & Candidate Ranking System
 
 An AI-powered Resume Screening & Candidate Ranking System built with **Python** and **Flask**. This project aims to automate resume screening by extracting information from resumes, comparing them against job descriptions using NLP techniques, and ranking candidates based on semantic similarity.
 
-> **Project Status:** 🚧 Under Development
+> **Project Status:** Under Development
 
 ---
 
-## 📌 Overview
+## Overview
 
 Recruiters often spend significant time manually reviewing resumes. This project streamlines that process by leveraging Natural Language Processing (NLP) to parse resumes, extract relevant skills, and rank candidates based on how well they match a given job description.
 
 ---
 
-## 🎯 Planned Features
+## Planned Features
 
 - Resume upload (PDF, DOCX, TXT)
 - Resume text extraction
@@ -26,7 +26,7 @@ Recruiters often spend significant time manually reviewing resumes. This project
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Category | Technologies |
 |----------|--------------|
@@ -41,7 +41,7 @@ Recruiters often spend significant time manually reviewing resumes. This project
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 resume-screening/
@@ -60,7 +60,7 @@ resume-screening/
 
 ---
 
-## ✅ Current Progress
+## Current Progress
 
 - Flask application factory
 - Configuration management
@@ -72,7 +72,7 @@ resume-screening/
 
 ---
 
-## 📍 Current API
+## Current API
 
 ### Health Check
 
@@ -91,7 +91,7 @@ Response:
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Clone the repository
 
@@ -134,7 +134,7 @@ python app.py
 
 ---
 
-## 🧪 Run Tests
+##  Run Tests
 
 ```bash
 pytest
@@ -142,7 +142,7 @@ pytest
 
 ---
 
-## 🗺 Roadmap
+##  Roadmap
 
 - [x] Project initialization
 - [x] Flask backend setup
@@ -158,13 +158,13 @@ pytest
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Sarathy**
 
