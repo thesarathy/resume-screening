@@ -2,69 +2,114 @@
 {% block title %}New ranking{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="card-body">
-        <h1 class="h4 mb-1">Rank candidates against a job description</h1>
-        <p class="text-muted mb-4">Upload resumes and we'll score how well each matches the JD.</p>
+<div class="card">
+  <h1>Rank candidates against a job description</h1>
+  <p class="sub">Drag in resumes or browse for files — we'll score how well each matches the JD.</p>
 
-        <form method="post" action="{{ url_for('rank') }}" enctype="multipart/form-data">
-          <div class="mb-3">
-            <label for="job_description" class="form-label">Job description</label>
-            <textarea class="form-control" id="job_description" name="job_description"
-                      rows="6" required placeholder="Paste the job posting here..."></textarea>
-          </div>
+  <form method="post" action="{{ url_for('rank') }}" enctype="multipart/form-data" id="rank-form">
+    <div style="margin-bottom: 20px;">
+      <label class="field" for="job_description">Job description</label>
+      <textarea id="job_description" name="job_description" rows="6" required
+                placeholder="Paste the job posting here..."></textarea>
+    </div>
 
-          <div class="mb-3">
-            <label class="form-label">Resumes (PDF, DOCX, TXT)</label>
-            <div id="resume-files">
-              <div class="input-group mb-2 file-row">
-                <input class="form-control" type="file" name="resumes"
-                       accept=".pdf,.docx,.txt" required>
-                <button type="button" class="btn btn-outline-danger remove-file"
-                        aria-label="Remove this file">✕</button>
-              </div>
-            </div>
-            <div class="form-text">Select one file per row, or use Ctrl/Shift-click inside a
-              picker to choose several at once. You can add more rows below.</div>
-            <button type="button" id="add-file" class="btn btn-sm btn-outline-secondary mt-1">＋ Add another resume</button>
-          </div>
+    <div style="margin-bottom: 20px;">
+      <label class="field">Resumes (PDF, DOCX, TXT)</label>
+      <input type="file" id="file-input" name="resumes" multiple
+             accept=".pdf,.docx,.txt" style="display:none;">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">📎</div>
+        <div class="dz-title">Drop resumes here, or click to browse</div>
+        <div class="dz-hint">You can select multiple files at once</div>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
 
-          <script>
-            const container = document.getElementById("resume-files");
-            document.getElementById("add-file").addEventListener("click", function () {
-              const row = container.querySelector(".file-row").cloneNode(true);
-              row.querySelector("input").value = "";
-              container.appendChild(row);
-            });
-            container.addEventListener("click", function (e) {
-              if (e.target.classList.contains("remove-file")) {
-                const rows = container.querySelectorAll(".file-row");
-                // Always keep at least one file input.
-                if (rows.length > 1) e.target.closest(".file-row").remove();
-              }
-            });
-          </script>
+    <div style="margin-bottom: 26px;">
+      <label class="field">Ranking method</label>
+      <div class="seg">
+        <input type="radio" name="method" id="m-tfidf" value="tfidf" checked>
+        <label for="m-tfidf">TF-IDF<span class="mini">fast · offline</span></label>
 
-          <div class="mb-4">
-            <label class="form-label d-block">Ranking method</label>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="method" id="m-tfidf"
-                     value="tfidf" checked>
-              <label class="form-check-label" for="m-tfidf">TF-IDF <span class="text-muted">(fast, offline)</span></label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="method" id="m-emb"
-                     value="embeddings">
-              <label class="form-check-label" for="m-emb">Sentence Transformer <span class="text-muted">(semantic, downloads model on first use)</span></label>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-primary">Rank candidates</button>
-        </form>
+        <input type="radio" name="method" id="m-emb" value="embeddings">
+        <label for="m-emb">Semantic<span class="mini">downloads model</span></label>
       </div>
     </div>
-  </div>
+
+    <button type="submit" class="btn-primary">Rank candidates</button>
+  </form>
 </div>
+
+<script>
+  const input = document.getElementById("file-input");
+  const dropzone = document.getElementById("dropzone");
+  const chips = document.getElementById("chips");
+  const form = document.getElementById("rank-form");
+
+  // Keep one FileList behind the scenes; rebuild via DataTransfer so the
+  // hidden input submits every selected file under name="resumes".
+  function currentFiles() { return Array.from(input.files || []); }
+
+  function addFiles(newFiles) {
+    const merged = [...currentFiles(), ...newFiles];
+    const dt = new DataTransfer();
+    merged.forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    renderChips();
+  }
+
+  function removeFileAt(index) {
+    const remaining = currentFiles().filter((_, i) => i !== index);
+    const dt = new DataTransfer();
+    remaining.forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    renderChips();
+  }
+
+  function renderChips() {
+    chips.innerHTML = "";
+    currentFiles().forEach((f, i) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = f.name;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "✕";
+      btn.setAttribute("aria-label", "Remove " + f.name);
+      btn.addEventListener("click", () => removeFileAt(i));
+      chip.appendChild(btn);
+      chips.appendChild(chip);
+    });
+  }
+
+  dropzone.addEventListener("click", () => input.click());
+  input.addEventListener("change", () => renderChips());
+
+  ["dragover", "dragenter"].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+  });
+  ["dragleave", "drop"].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+    });
+  });
+  dropzone.addEventListener("drop", (e) => {
+    if (e.dataTransfer && e.dataTransfer.files.length) {
+      addFiles(Array.from(e.dataTransfer.files));
+    }
+  });
+
+  form.addEventListener("submit", (e) => {
+    if (currentFiles().length === 0) {
+      e.preventDefault();
+      dropzone.style.borderColor = "#f43f5e";
+      dropzone.querySelector(".dz-hint").textContent = "Please add at least one resume first.";
+      return;
+    }
+  });
+</script>
 {% endblock %}

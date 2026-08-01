@@ -2,74 +2,47 @@
 {% block title %}Ranking results{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="results-head">
   <div>
-    <h1 class="h4 mb-0">Ranked candidates</h1>
-    <div class="text-muted">Method: <span class="badge bg-secondary">{{ method }}</span></div>
+    <h1>Ranked candidates</h1>
+    <span class="method-badge">method · {{ method }}</span>
   </div>
-  <a href="{{ url_for('export_csv') }}" class="btn btn-success">⬇ Download CSV</a>
+  <a class="btn-csv" href="{{ url_for('export_csv') }}">⬇ Download CSV</a>
 </div>
 
 {% if errors %}
-<div class="alert alert-warning">
+<div class="alert alert-warn">
   <strong>{{ errors|length }} file(s) skipped:</strong>
-  <ul class="mb-0">
+  <ul>
     {% for e in errors %}<li>{{ e }}</li>{% endfor %}
   </ul>
 </div>
 {% endif %}
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>#</th>
-          <th>Candidate</th>
-          <th style="width: 24%">Match</th>
-          <th>Skills</th>
-          <th>Contact</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in candidates %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>
-            <div class="fw-semibold">{{ c.name or c.filename }}</div>
-            <div class="text-muted small">{{ c.filename }}</div>
-            {% if c.education %}
-              <div class="text-muted small">{{ c.education|join("; ") }}</div>
-            {% endif %}
-            {% if c.experience_years is not none %}
-              <div class="text-muted small">{{ c.experience_years }} yrs experience</div>
-            {% endif %}
-          </td>
-          <td>
-            <div class="fw-semibold">{{ "%.0f"|format(c.match_pct) }}%</div>
-            <div class="score-bar"><div class="score-fill" style="width: {{ c.match_pct }}%"></div></div>
-            <div class="text-muted small">{{ "%.3f"|format(c.score) }}</div>
-          </td>
-          <td>
-            {% for s in c.skills %}
-              <span class="badge bg-primary bg-opacity-10 text-primary me-1">{{ s }}</span>
-            {% else %}
-              <span class="text-muted">—</span>
-            {% endfor %}
-            {% if c.candidate_skills %}
-              <div class="small text-muted mt-1">candidates: {{ c.candidate_skills|join(", ") }}</div>
-            {% endif %}
-          </td>
-          <td class="small">
-            {% if c.email %}<div>{{ c.email }}</div>{% endif %}
-            {% if c.phone %}<div class="text-muted">{{ c.phone }}</div>{% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No candidates to show.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{% for c in candidates %}
+<div class="cand">
+  <div class="rank-badge">{{ loop.index }}</div>
+  <div class="body">
+    <div class="name">{{ c.name or c.filename }}</div>
+    <div class="file">{{ c.filename }}</div>
+    <div class="meta">
+      {% if c.email %}<span>✉ {{ c.email }}</span>{% endif %}
+      {% if c.phone %}<span>☎ {{ c.phone }}</span>{% endif %}
+      {% if c.experience_years is not none %}<span>{{ c.experience_years }} yrs exp</span>{% endif %}
+      {% for edu in c.education %}<span>🎓 {{ edu }}</span>{% endfor %}
+    </div>
+    <div class="skills">
+      {% for s in c.skills %}<span class="chip-skill">{{ s }}</span>{% endfor %}
+      {% for s in c.candidate_skills %}<span class="chip-skill cand-skill">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+  <div class="score-col">
+    <div class="pct">{{ c.match_pct }}%</div>
+    <div class="score-track"><div class="score-fill" style="width: {{ c.match_pct }}%"></div></div>
+    <div class="score-num">similarity {{ "%.3f"|format(c.score) }}</div>
   </div>
 </div>
+{% else %}
+<div class="empty">No candidates to show.</div>
+{% endfor %}
 {% endblock %}
