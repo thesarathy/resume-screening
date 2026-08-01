@@ -2,23 +2,22 @@
 Similarity scoring: compares a job description against one or more
 resumes and returns a similarity score for each.
 
-Two independent implementations will exist here (this step: TF-IDF; the
-next step: Sentence-Transformer embeddings), both behind the same
-BaseSimilarityScorer interface -- the Strategy pattern, same approach
-used for resume parsing in app/parser.py. This is what lets the app
-expose a "ranking method" toggle later (Step 8/9) without ranking.py
-needing to know or care which concrete scorer it's talking to.
+Two independent implementations live here -- TF-IDF and
+Sentence-Transformer embeddings -- both behind the same
+BaseSimilarityScorer interface (the Strategy pattern, same approach
+used for resume parsing in app/parser.py). This lets the app expose a
+"ranking method" toggle without ranking.py needing to know or care
+which concrete scorer it's talking to.
 
 Design note on preprocessing: each scorer decides its own preprocessing
 internally rather than the caller deciding for it. TF-IDF is a
 bag-of-words model, so it gets the FULLY normalized text
 (TextPreprocessor.normalize() -- lowercased, lemmatized, stopwords
-removed). Sentence-Transformer embeddings (Step 7) want the opposite --
-natural, un-stripped sentences -- see app/preprocessing.py's module
-docstring for why. Encapsulating that choice inside each scorer, rather
-than pushing it up to ranking.py, is what keeps the two methods truly
-swappable: the caller always passes raw resume/JD text and gets a score
-back, regardless of which method is selected.
+removed). Sentence-Transformer embeddings want the opposite -- natural,
+un-stripped sentences -- see app/preprocessing.py's module docstring
+for why. Encapsulating that choice inside each scorer is what keeps the
+two methods truly swappable: the caller always passes raw resume/JD
+text and gets a score back, regardless of which method is selected.
 """
 
 import logging
@@ -59,14 +58,15 @@ class TfidfSimilarityScorer(BaseSimilarityScorer):
 
     Important implementation detail: the TfidfVectorizer is fit fresh
     inside every call to score(), not built once and reused. Unlike a
-    pretrained embedding model (Step 7), TF-IDF's vocabulary and IDF
-    weights are derived entirely from whatever document set is passed
-    in -- refitting per batch is correct, not wasteful, since a
-    vectorizer fit on one job description's resume pool would give
-    meaningless IDF weights for a completely different job posting.
+    pretrained embedding model (the sentence-transformer scorer below),
+    TF-IDF's vocabulary and IDF weights are derived entirely from
+    whatever document set is passed in -- refitting per batch is correct,
+    not wasteful, since a vectorizer fit on one job description's resume
+    pool would give meaningless IDF weights for a completely different
+    job posting.
 
-    Trade-off vs. Sentence-Transformer embeddings (Step 7): TF-IDF only
-    "sees" exact vocabulary overlap -- a resume saying "constructed REST
+    Trade-off vs. Sentence-Transformer embeddings: TF-IDF only "sees"
+    exact vocabulary overlap -- a resume saying "constructed REST
     services" won't score well against a JD saying "built APIs", even
     though they mean the same thing, because the words themselves don't
     match. It's fast, has zero model-download cost, and is fully
@@ -103,9 +103,6 @@ class TfidfSimilarityScorer(BaseSimilarityScorer):
 
         similarities = cosine_similarity(jd_vector, resume_vectors)[0]
         return [float(s) for s in similarities]
-
-
-
 
 
 class EmbeddingModel(Protocol):
@@ -159,10 +156,10 @@ class SentenceTransformerSimilarityScorer(BaseSimilarityScorer):
     lemmatizing would remove exactly the structure the model relies on to
     understand meaning (see app/preprocessing.py's module docstring).
 
-    Trade-off vs. TF-IDF (previous step): far better at matching
-    paraphrased or differently-worded skills/experience, at the cost of a
-    ~90MB pretrained model download on first use, slower inference, and
-    much less interpretability -- there's no simple way to point at "this
+    Trade-off vs. TF-IDF: far better at matching paraphrased or
+    differently-worded skills/experience, at the cost of a ~90MB
+    pretrained model download on first use, slower inference, and much
+    less interpretability -- there's no simple way to point at "this
     word" as the reason for a given score, the way there is with TF-IDF.
     """
 

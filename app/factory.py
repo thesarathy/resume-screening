@@ -12,13 +12,12 @@ throughout the engine (see app/ranking.py's module docstring).
 
 import logging
 
-from app.preprocessing import load_spacy_model
+from app.preprocessing import TextPreprocessor, load_spacy_model
 from app.similarity import (
     BaseSimilarityScorer,
     SentenceTransformerSimilarityScorer,
     TfidfSimilarityScorer,
 )
-from app.preprocessing import TextPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -32,19 +31,19 @@ VALID_METHODS = (METHOD_TFIDF, METHOD_EMBEDDINGS)
 class ScorerFactory:
     """Builds similarity scorers from a method name.
 
-    The SentenceTransformer model is deliberately loaded lazily, only when
-    the embeddings method is actually requested: it pulls in PyTorch and a
-    ~90MB pretrained model download on first use. Requests for the default
-    TF-IDF method never pay that cost, and the app stays responsive at
-    startup even if the model has never been downloaded.
+    Both heavy models are loaded lazily rather than at app startup:
+
+    - The spaCy pipeline is built on first access and cached, so a
+      memory-constrained host doesn't tip over at boot (see nlp).
+    - The SentenceTransformer model is only built when the embeddings
+      method is actually requested -- it pulls in PyTorch and a ~90MB
+      pretrained model download, which would be wasted (and heavy) at
+      startup. Requests for the default TF-IDF method never pay that cost.
     """
 
     def __init__(self, nlp=None) -> None:
-        # spaCy is loaded LAZILY on first use (see nlp) rather than at app
-        # startup. On memory-constrained hosts (e.g. Render free, 512MB),
-        # loading it at boot can tip the web process over the limit before
-        # any request even arrives. A caller may also inject a prebuilt
-        # pipeline (e.g. a lighter fake in tests) to skip the load entirely.
+        # Loaded lazily on first access (see nlp); a caller may inject a
+        # prebuilt pipeline (e.g. a lighter fake in tests) to skip loading.
         self._nlp = nlp
         self._embedding_scorer: BaseSimilarityScorer | None = None
 
@@ -57,7 +56,7 @@ class ScorerFactory:
             self._nlp = load_spacy_model()
         return self._nlp
 
-    def build_scorer(self, method: str) -> BaseSimilarityScorer:
+    def build_scorer(self, method: str = METHOD_TFIDF) -> BaseSimilarityScorer:
         """Return a scorer for the given method name.
 
         Raises:
