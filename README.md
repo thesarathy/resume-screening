@@ -142,21 +142,7 @@ pytest
 
 ---
 
-##  Roadmap
 
-- [x] Project initialization
-- [x] Flask backend setup
-- [x] Health API
-- [ ] Resume upload API
-- [ ] Resume parsing
-- [ ] Skill extraction
-- [ ] TF-IDF ranking
-- [ ] Sentence Transformer ranking
-- [ ] Recruiter dashboard
-- [ ] CSV export
-- [ ] Deployment on Render
-
----
 
 ## License
 
