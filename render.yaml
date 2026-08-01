@@ -18,7 +18,9 @@ services:
     buildCommand: >-
       pip install -r requirements.txt &&
       python -m spacy download en_core_web_sm
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    # Single worker keeps memory low (each worker holds its own copy of the
+    # loaded spaCy pipeline); Render free has only 512MB.
+    startCommand: gunicorn wsgi:app --workers 1 --threads 1 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
       - key: FLASK_ENV
         value: production

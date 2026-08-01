@@ -40,14 +40,21 @@ class ScorerFactory:
     """
 
     def __init__(self, nlp=None) -> None:
-        # Load the shared spaCy pipeline once; callers may inject one
-        # (e.g. a lighter fake in tests) to avoid a real model load.
-        self._nlp = nlp if nlp is not None else load_spacy_model()
+        # spaCy is loaded LAZILY on first use (see nlp) rather than at app
+        # startup. On memory-constrained hosts (e.g. Render free, 512MB),
+        # loading it at boot can tip the web process over the limit before
+        # any request even arrives. A caller may also inject a prebuilt
+        # pipeline (e.g. a lighter fake in tests) to skip the load entirely.
+        self._nlp = nlp
         self._embedding_scorer: BaseSimilarityScorer | None = None
 
     @property
     def nlp(self):
-        """The single shared spaCy pipeline used across all extractors."""
+        """The single shared spaCy pipeline used across all extractors,
+        loaded on first access and cached for the lifetime of the process.
+        """
+        if self._nlp is None:
+            self._nlp = load_spacy_model()
         return self._nlp
 
     def build_scorer(self, method: str) -> BaseSimilarityScorer:
@@ -57,7 +64,7 @@ class ScorerFactory:
             ValueError: if `method` is not one of VALID_METHODS.
         """
         if method == METHOD_TFIDF:
-            return TfidfSimilarityScorer(TextPreprocessor(nlp=self._nlp))
+            return TfidfSimilarityScorer(TextPreprocessor(nlp=self.nlp))
         if method == METHOD_EMBEDDINGS:
             # Build once, then cache and reuse for subsequent requests in
             # this process -- the model is too heavy to reload per request.
