@@ -1,0 +1,29 @@
+# Render Blueprint — deploy this repo to Render in one click.
+#
+# Connect this GitHub repo on the Render dashboard; it reads this file and
+# provisions the web service automatically.
+#
+# Before first deploy, set DATABASE_URL to a free PostgreSQL (e.g. Neon or
+# Supabase) so ranking history persists across deploys/restarts. Render's
+# free web-service disk is ephemeral, so SQLite would lose data on restart.
+#
+# NOTE: a custom domain requires a paid Render plan -- the free *.onrender.com
+# subdomain is used until then.
+
+services:
+  - type: web
+    name: resume-screening
+    runtime: python
+    plan: free
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      python -m spacy download en_core_web_sm
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      # Create a free Postgres (Neon/Supabase) and paste its connection string:
+      # - key: DATABASE_URL
+      #   sync: false
